@@ -1,50 +1,59 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
 import {
   Brain,
   ChevronLeft,
   ChevronRight,
-  FolderOpen,
+  Folder,
   Hash,
   LayoutGrid,
-  Lightbulb,
-  Code,
   LogIn,
-  Palette,
-  User,
   Search,
+  Trash2,
+  X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { useRouter } from "next/navigation"
+import { signOut } from "@/actions/auth.actions"
 
 interface AppSidebarProps {
+  categories: string[]
+  tags: string[]
   selectedCategory: string
   onCategoryChange: (category: string) => void
   searchQuery: string
   onSearchChange: (query: string) => void
+  selectedTag: string | null;
+  onTagSelect: (tag: string | null) => void;
   noteCount: number
+  onDeleteCategory: (name: string) => void
+  onDeleteTag: (name: string) => void
 }
 
-const navItems = [
-  { label: "All Notes", icon: LayoutGrid, category: "All Notes" },
-  { label: "Learning", icon: Lightbulb, category: "Learning" },
-  { label: "Engineering", icon: Code, category: "Engineering" },
-  { label: "Design", icon: Palette, category: "Design" },
-  { label: "Personal", icon: User, category: "Personal" },
-]
-
 export function AppSidebar({
+  categories,
+  tags,
   selectedCategory,
   onCategoryChange,
   searchQuery,
   onSearchChange,
+  selectedTag,
+  onTagSelect,
   noteCount,
+  onDeleteCategory,
+  onDeleteTag
 }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    await signOut()
+    router.push('/auth')
+  }
 
   return (
     <aside
@@ -83,75 +92,103 @@ export function AppSidebar({
         </div>
       )}
 
-      {/* Navigation */}
-      <nav className="flex-1 px-2 py-3">
-        {!collapsed && (
-          <span className="mb-2 block px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            Categories
-          </span>
-        )}
-        <ul className="flex flex-col gap-0.5">
-          {navItems.map((item) => {
-            const Icon = item.icon
-            const isActive = selectedCategory === item.category
-            return (
-              <li key={item.category}>
-                <button
-                  onClick={() => onCategoryChange(item.category)}
-                  className={cn(
-                    "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
-                  )}
-                >
-                  <Icon className="size-4 shrink-0" />
-                  {!collapsed && <span>{item.label}</span>}
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      </nav>
-
-      {/* Popular Tags */}
-      {!collapsed && (
-        <div className="border-t border-sidebar-border px-4 py-3">
-          <span className="mb-2 block text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            Popular Tags
-          </span>
-          <div className="flex flex-wrap gap-1.5">
-            {["react", "learning", "design", "productivity", "api"].map(
-              (tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center gap-1 rounded-md bg-sidebar-accent px-2 py-0.5 text-xs text-muted-foreground"
-                >
-                  <Hash className="size-2.5" />
-                  {tag}
-                </span>
-              )
+      {/* Navigation - Đã được viết lại bằng thẻ HTML thuần, bao mượt */}
+      <div className="flex-1 overflow-y-auto py-2">
+        <nav className="flex flex-col gap-1 px-2">
+          {/* Nút All Notes */}
+          <button
+            onClick={() => onCategoryChange("All Notes")}
+            className={cn(
+              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              selectedCategory === "All Notes"
+                ? "bg-sidebar-accent text-sidebar-foreground"
+                : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+              collapsed && "justify-center px-0"
             )}
-          </div>
-        </div>
-      )}
+            title={collapsed ? "All Notes" : undefined}
+          >
+            <LayoutGrid className="size-4 shrink-0" />
+            {!collapsed && <span>All Notes</span>}
+          </button>
+
+          {/* Danh sách Categories thật */}
+          {categories.map((category) => (
+            <div key={category} className="group relative flex items-center">
+              <button
+                onClick={() => onCategoryChange(category)}
+                className={cn(
+                  "flex flex-1 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  selectedCategory === category
+                    ? "bg-sidebar-accent text-sidebar-foreground"
+                    : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
+                  collapsed && "justify-center px-0"
+                )}
+              >
+                <Folder className="size-4 shrink-0" />
+                {!collapsed && <span className="truncate">{category}</span>}
+              </button>
+
+              {/* Nút xóa Category (Chỉ hiện khi hover) */}
+              {!collapsed && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteCategory(category); // Gọi hàm ở đây
+                  }}
+                  className="absolute right-2 opacity-0 group-hover:opacity-100 p-1 hover:text-destructive transition-opacity"
+                >
+                  <Trash2 className="size-3" />
+                </button>
+              )}
+            </div>
+          ))}
+        </nav>
+
+        {/* Popular Tags */}
+        {tags.map((tag) => {
+          const isSelected = selectedTag === tag;
+          return (
+            <div key={tag} className="group relative inline-flex">
+              <button
+                onClick={() => onTagSelect(isSelected ? null : tag)}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs transition-colors",
+                  isSelected
+                    ? "bg-foreground text-background font-medium"
+                    : "bg-sidebar-accent text-muted-foreground hover:bg-sidebar-accent/80 hover:text-sidebar-foreground"
+                )}
+              >
+                <Hash className="size-2.5" />
+                {tag}
+              </button>
+
+              {/* Nút xóa Tag nhỏ xíu ở góc */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteTag(tag); // Gọi hàm ở đây
+                }}
+                className="absolute -top-1 -right-1 hidden group-hover:flex size-3 items-center justify-center rounded-full bg-destructive text-white shadow-sm"
+              >
+                <X className="size-2" />
+              </button>
+            </div>
+          )
+        })}
+      </div>
 
       {/* Footer */}
       <div className="flex flex-col gap-2 border-t border-sidebar-border px-3 py-3">
-        {/* Sign In link */}
         <Button
           variant="outline"
           size={collapsed ? "icon-sm" : "sm"}
-          className="w-full border-sidebar-border text-muted-foreground hover:text-sidebar-foreground"
-          asChild
+          className="w-full border-sidebar-border text-muted-foreground hover:text-destructive hover:border-destructive/30 hover:bg-destructive/10"
+          onClick={handleLogout}
         >
-          <Link href="/auth">
-            <LogIn className="size-4 shrink-0" />
-            {!collapsed && <span>Sign In</span>}
-          </Link>
+          <LogIn className="size-4 shrink-0 rotate-180" />
+          {!collapsed && <span>Log out</span>}
         </Button>
 
-        {/* Bottom row: theme toggle, note count, collapse */}
         <div className="flex items-center justify-between">
           <ThemeToggle />
           {!collapsed && (
@@ -173,6 +210,6 @@ export function AppSidebar({
           </Button>
         </div>
       </div>
-    </aside>
+    </aside >
   )
 }

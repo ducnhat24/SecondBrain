@@ -1,363 +1,237 @@
 "use client"
 
-import { useState, useEffect, useCallback, type DragEvent } from "react"
-import Image from "next/image"
-import {
-  Hash,
-  Calendar,
-  Pencil,
-  Eye,
-  X,
-  ImagePlus,
-} from "lucide-react"
+import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { MarkdownRenderer } from "@/components/markdown-renderer"
-import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Calendar, Tag, X, FileText, Edit2, Save, Trash2 } from "lucide-react"
+import ReactMarkdown from "react-markdown"
 import type { Note } from "@/lib/sample-data"
+import { toast } from "sonner"
+import { updateNote, deleteNote } from "@/actions/note.actions"
 
 interface ViewNoteModalProps {
   note: Note | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  onEditNote?: (note: Note) => void
+  onEditNote: (note: Note) => void
+  onDeleteNote?: (id: string) => void // Thêm prop xóa nếu cần
 }
 
-export function ViewNoteModal({
-  note,
-  open,
-  onOpenChange,
-  onEditNote,
-}: ViewNoteModalProps) {
+export function ViewNoteModal({ note, open, onOpenChange, onEditNote, onDeleteNote }: ViewNoteModalProps) {
   const [isEditing, setIsEditing] = useState(false)
-  const [editTab, setEditTab] = useState<"write" | "preview">("write")
   const [editTitle, setEditTitle] = useState("")
   const [editContent, setEditContent] = useState("")
-  const [editImage, setEditImage] = useState<string | null>(null)
-  const [dragOver, setDragOver] = useState(false)
+  const [editCategory, setEditCategory] = useState("")
+  const [editTags, setEditTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
 
-  // Reset edit state whenever a new note is opened or modal closes
+  // Cập nhật state khi note thay đổi
   useEffect(() => {
-    if (note && open) {
+    if (note) {
       setEditTitle(note.title)
       setEditContent(note.content)
-      setEditImage(note.coverImage ?? null)
+      setEditCategory(note.category)
+      setEditTags(note.tags)
     }
-    if (!open) {
-      setIsEditing(false)
-      setEditTab("write")
-    }
-  }, [note, open])
-
-  const enterEditMode = () => {
-    if (!note) return
-    setEditTitle(note.title)
-    setEditContent(note.content)
-    setEditImage(note.coverImage ?? null)
-    setEditTab("write")
-    setIsEditing(true)
-  }
-
-  const cancelEdit = () => {
-    if (!note) return
-    setEditTitle(note.title)
-    setEditContent(note.content)
-    setEditImage(note.coverImage ?? null)
-    setIsEditing(false)
-    setEditTab("write")
-  }
-
-  const saveEdit = () => {
-    if (!note || !editTitle.trim()) return
-    const updatedNote: Note = {
-      ...note,
-      title: editTitle.trim(),
-      content: editContent.trim(),
-      coverImage: editImage ?? undefined,
-      updatedAt: new Date().toISOString().split("T")[0],
-    }
-    onEditNote?.(updatedNote)
-    setIsEditing(false)
-    setEditTab("write")
-  }
-
-  // Image upload handlers
-  const handleDragOver = useCallback((e: DragEvent) => {
-    e.preventDefault()
-    setDragOver(true)
-  }, [])
-
-  const handleDragLeave = useCallback((e: DragEvent) => {
-    e.preventDefault()
-    setDragOver(false)
-  }, [])
-
-  const handleDrop = useCallback((e: DragEvent) => {
-    e.preventDefault()
-    setDragOver(false)
-    const files = e.dataTransfer.files
-    if (files.length > 0 && files[0].type.startsWith("image/")) {
-      const reader = new FileReader()
-      reader.onloadend = () => setEditImage(reader.result as string)
-      reader.readAsDataURL(files[0])
-    }
-  }, [])
-
-  const handleFileSelect = useCallback(() => {
-    const input = document.createElement("input")
-    input.type = "file"
-    input.accept = "image/*"
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (file) {
-        const reader = new FileReader()
-        reader.onloadend = () => setEditImage(reader.result as string)
-        reader.readAsDataURL(file)
-      }
-    }
-    input.click()
-  }, [])
+  }, [note])
 
   if (!note) return null
 
-  /* ------- EDIT MODE ------- */
-  if (isEditing) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-4xl h-[90vh] flex flex-col backdrop-blur-sm bg-card/98">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-card-foreground">
-              <Pencil className="size-5" />
-              Edit Note
-            </DialogTitle>
-            <DialogDescription>
-              Modify your note below. Switch to Preview to see how it renders.
-            </DialogDescription>
-          </DialogHeader>
+  const handleSave = async () => {
+    setIsSaving(true)
+    try {
+      // Gọi API thật từ Backend
+      const res = await updateNote(note.id, {
+        title: editTitle,
+        content: editContent,
+        categoryName: editCategory,
+        tags: editTags
+      })
 
-          <div className="flex flex-1 flex-col gap-4 min-h-0">
-            {/* Title */}
-            <Input
-              placeholder="Note title..."
-              className="text-base font-medium h-11 shrink-0"
-              value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-            />
-
-            {/* Write / Preview Tabs */}
-            <div className="flex flex-1 flex-col min-h-0">
-              <div className="flex items-center gap-1 border-b border-border pb-0 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setEditTab("write")}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px",
-                    editTab === "write"
-                      ? "border-foreground text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Pencil className="size-3.5" />
-                  Write
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditTab("preview")}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px",
-                    editTab === "preview"
-                      ? "border-foreground text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <Eye className="size-3.5" />
-                  Preview
-                </button>
-              </div>
-
-              <div className="flex-1 min-h-0 pt-4">
-                {editTab === "write" ? (
-                  <Textarea
-                    placeholder="Write your note in Markdown..."
-                    className="h-full resize-none text-sm leading-relaxed font-mono"
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                  />
-                ) : (
-                  <ScrollArea className="h-full rounded-lg border border-border bg-background p-6">
-                    {editContent.trim() ? (
-                      <MarkdownRenderer content={editContent} />
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">
-                        Nothing to preview yet. Switch to the Write tab and
-                        start typing.
-                      </p>
-                    )}
-                  </ScrollArea>
-                )}
-              </div>
-            </div>
-
-            {/* Image Upload */}
-            <div className="shrink-0">
-              {editImage ? (
-                <div className="relative rounded-lg overflow-hidden border border-border">
-                  <img
-                    src={editImage}
-                    alt="Cover preview"
-                    className="w-full h-36 object-cover"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="absolute top-2 right-2 bg-background/80 hover:bg-background"
-                    onClick={() => setEditImage(null)}
-                  >
-                    <X className="size-3.5" />
-                  </Button>
-                </div>
-              ) : (
-                <div
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  onClick={handleFileSelect}
-                  className={cn(
-                    "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed py-6 transition-colors",
-                    dragOver
-                      ? "border-primary/50 bg-primary/5"
-                      : "border-border hover:border-muted-foreground/30 hover:bg-accent/50"
-                  )}
-                >
-                  <ImagePlus className="size-5 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    Drop an image here, or click to browse
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Edit Footer */}
-          <div className="flex items-center justify-end gap-2 pt-2 shrink-0 border-t border-border">
-            <Button variant="outline" onClick={cancelEdit}>
-              Cancel
-            </Button>
-            <Button onClick={saveEdit} disabled={!editTitle.trim()}>
-              Save Changes
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    )
+      if (res.success) {
+        onEditNote({
+          ...note,
+          title: editTitle,
+          content: editContent,
+          category: editCategory,
+          tags: editTags,
+          updatedAt: new Date().toISOString()
+        })
+        setIsEditing(false)
+        toast.success("Đã lưu thay đổi vào hệ thống! 💾")
+      } else {
+        toast.error("Lỗi: " + res.error)
+      }
+    } catch (error) {
+      toast.error("Có lỗi xảy ra khi kết nối Server.")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
-  /* ------- VIEW MODE ------- */
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden bg-card">
-        <DialogHeader className="sr-only">
-          <DialogTitle>{note.title}</DialogTitle>
-          <DialogDescription>Viewing note: {note.title}</DialogDescription>
-        </DialogHeader>
+  const handleDelete = async () => {
+    if (!window.confirm("Bạn có chắc muốn xóa ghi chú này?")) return
 
-        {/* Cover Image - full bleed */}
+    const res = await deleteNote(note.id) // Gọi API Server Action
+
+    if (res.success) {
+      toast.success("Đã xóa note vĩnh viễn! 🗑️")
+
+      if (onDeleteNote) {
+        onDeleteNote(note.id)
+      }
+
+      onOpenChange(false) // Đóng Modal
+    } else {
+      toast.error("Xóa thất bại: " + res.error)
+    }
+  }
+  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const newTag = tagInput.trim().toLowerCase()
+      if (newTag && !editTags.includes(newTag)) {
+        setEditTags(prev => [...prev, newTag])
+      }
+      setTagInput("")
+    }
+  }
+
+  const handleRemoveTag = (e: React.MouseEvent, tagToRemove: string) => {
+    e.stopPropagation()
+    setEditTags(prev => prev.filter(t => t !== tagToRemove))
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(val) => {
+      onOpenChange(val)
+      if (!val) setIsEditing(false) // Reset về mode view khi đóng
+    }}>
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
+        {/* Header Image */}
         {note.coverImage && (
-          <div className="relative w-full h-56 sm:h-64 shrink-0">
-            <Image
-              src={note.coverImage}
-              alt={`Cover for ${note.title}`}
-              fill
-              className="object-cover"
-              sizes="(max-width: 896px) 100vw, 896px"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-card/80 to-transparent" />
+          <div className="w-full h-48 sm:h-64 relative shrink-0">
+            <img src={note.coverImage} alt={note.title} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
           </div>
         )}
 
-        {/* Edit button - top right of content area */}
-        <div className="absolute top-3 right-12 z-20">
-          <Button
-            variant="outline"
-            size="icon-sm"
-            className="rounded-full bg-card/80 backdrop-blur-sm border-border hover:bg-card shadow-sm"
-            onClick={enterEditMode}
-            aria-label="Edit note"
-          >
-            <Pencil className="size-3.5" />
-          </Button>
+        <div className="flex-1 overflow-y-auto p-6 pt-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1 bg-secondary/50 px-2 py-1 rounded-md">
+                <Calendar className="size-3" />
+                {note.createdAt}
+              </div>
+              <Badge variant="outline" className="font-normal capitalize">{note.category}</Badge>
+            </div>
+            {!isEditing && (
+              <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)} className="gap-2">
+                <Edit2 className="size-3.5" /> Edit
+              </Button>
+            )}
+          </div>
+
+          {isEditing ? (
+            <div className="space-y-4">
+              <Input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="text-2xl font-bold border-none bg-transparent p-0 focus-visible:ring-0 shadow-none h-auto"
+                placeholder="Note title..."
+              />
+
+              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                <Select value={editCategory} onValueChange={setEditCategory}>
+                  <SelectTrigger className="w-[160px] h-8 text-xs">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Learning">Learning</SelectItem>
+                    <SelectItem value="Engineering">Engineering</SelectItem>
+                    <SelectItem value="Design">Design</SelectItem>
+                    <SelectItem value="Personal">Personal</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <div className="flex-1 flex flex-wrap items-center gap-2 border rounded-md px-2 min-h-8 bg-background focus-within:ring-1 focus-within:ring-ring">
+                  {editTags.map(tag => (
+                    <Badge key={tag} variant="secondary" className="gap-1 px-1.5 py-0 text-[10px] font-normal group">
+                      {tag}
+                      <button
+                        type="button" // Ngăn chặn trigger submit form
+                        onClick={(e) => handleRemoveTag(e, tag)}
+                        className="ml-1 rounded-full outline-none hover:bg-destructive hover:text-destructive-foreground p-0.5 transition-colors"
+                      >
+                        <X className="size-2.5" />
+                      </button>
+                    </Badge>
+                  ))}
+                  <input
+                    placeholder="Add tags..."
+                    className="flex-1 bg-transparent border-none outline-none text-xs min-w-[80px] py-1"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleAddTag}
+                  />
+                </div>
+              </div>
+
+              <Textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                className="min-h-[300px] font-mono text-sm leading-relaxed"
+                placeholder="Content..."
+              />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <h1 className="text-3xl font-bold tracking-tight">{note.title}</h1>
+
+              <div className="flex flex-wrap gap-2">
+                {note.tags.map(tag => (
+                  <Badge key={tag} variant="secondary" className="gap-1 text-xs font-normal">
+                    <Tag className="size-3 opacity-70" /> {tag}
+                  </Badge>
+                ))}
+              </div>
+
+              <div className="prose prose-sm dark:prose-invert max-w-none border-t pt-6">
+                <ReactMarkdown>{note.content}</ReactMarkdown>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Scrollable Content */}
-        <ScrollArea className="flex-1 min-h-0">
-          <div className="px-8 py-6 sm:px-10 sm:py-8">
-            {/* Category + Date Row */}
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                {note.category}
-              </span>
-              <span className="text-muted-foreground/40">|</span>
-              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Calendar className="size-3" />
-                {new Date(note.updatedAt).toLocaleDateString("en-US", {
-                  month: "long",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </span>
+        <DialogFooter className="p-4 border-t bg-muted/20 shrink-0">
+          {isEditing ? (
+            <div className="flex justify-between w-full">
+              <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10" onClick={handleDelete
+              }>
+                <Trash2 className="size-4 mr-2" /> Delete Note
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>Cancel</Button>
+                <Button size="sm" onClick={handleSave} disabled={isSaving} className="gap-2">
+                  <Save className="size-4" /> {isSaving ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
             </div>
-
-            {/* Title */}
-            <h2 className="text-2xl sm:text-3xl font-bold leading-tight text-card-foreground text-balance mb-6">
-              {note.title}
-            </h2>
-
-            {/* Full Content -- Rendered Markdown */}
-            <MarkdownRenderer content={note.content} />
-
-            {/* Tags */}
-            <div className="flex flex-wrap gap-2 mt-8 pt-6 border-t border-border">
-              {note.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-secondary px-3 py-1 text-xs font-medium text-muted-foreground"
-                >
-                  <Hash className="size-3" />
-                  {tag}
-                </span>
-              ))}
-            </div>
-
-            {/* Metadata Footer */}
-            <div className="mt-6 flex items-center gap-4 text-[11px] text-muted-foreground/60">
-              <span>
-                Created{" "}
-                {new Date(note.createdAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </span>
-              <span>
-                Updated{" "}
-                {new Date(note.updatedAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </span>
-            </div>
-          </div>
-        </ScrollArea>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Close</Button>
+          )}
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
