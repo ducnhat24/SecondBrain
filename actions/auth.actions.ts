@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 
 export async function signInWithEmail(email: string, password: string) {
     const supabase = await createClient()
@@ -50,4 +51,28 @@ export async function signOut() {
     const supabase = await createClient()
     await supabase.auth.signOut()
     return { success: true }
+}
+
+export async function signInWithOAuth(provider: 'google' | 'github') {
+    const supabase = await createClient()
+
+    // Lấy URL hiện tại (localhost hoặc link Vercel)
+    const origin = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: provider,
+        options: {
+            // Chỉ định rõ nơi Google sẽ trả khách về
+            redirectTo: `${origin}/auth/callback`,
+        },
+    })
+
+    if (error) {
+        return { success: false, error: error.message }
+    }
+
+    // Nếu lấy được link Google thành công thì chuyển hướng trình duyệt sang đó
+    if (data.url) {
+        redirect(data.url)
+    }
 }

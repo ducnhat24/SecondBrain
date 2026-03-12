@@ -17,7 +17,7 @@ import {
 import { cn } from "@/lib/utils"
 
 // Import 2 hàm Server Actions mình vừa viết
-import { signInWithEmail, signUpWithEmail } from "@/actions/auth.actions"
+import { signInWithEmail, signUpWithEmail, signInWithOAuth } from "@/actions/auth.actions"
 
 type AuthMode = "login" | "register"
 
@@ -77,6 +77,10 @@ export function AuthForm() {
     setErrorMsg("") // Xóa lỗi khi chuyển tab
   }
 
+  const handleOAuthLogin = async (provider: 'google' | 'github') => {
+    await signInWithOAuth(provider)
+  }
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,var(--color-muted)_0%,transparent_50%)] opacity-50" />
@@ -105,6 +109,15 @@ export function AuthForm() {
           </CardHeader>
 
           <CardContent className="pt-2">
+            <div className="mt-4 flex flex-col gap-2">
+
+              <Button variant="outline" type="button" onClick={() => handleOAuthLogin('google')}>
+                Sign in with Google
+              </Button>
+              <Button variant="outline" type="button" onClick={() => handleOAuthLogin('github')}>
+                Sign in with GitHub
+              </Button>
+            </div>
             <div className="relative my-6 flex items-center">
               <div className="flex-1 border-t border-border" />
               <span className="mx-4 text-xs text-muted-foreground">or</span>
