@@ -52,20 +52,19 @@ interface NewNoteModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSave: (note: Note) => void
+  categories?: string[]
 }
 
-export function NewNoteModal({ open, onOpenChange, onSave }: NewNoteModalProps) {
-  // States cơ bản
+export function NewNoteModal({ open, onOpenChange, onSave, categories = [] }: NewNoteModalProps) {
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
-  const [category, setCategory] = useState("Personal") // Thêm state Category
-  const [tags, setTags] = useState<string[]>([])       // Thêm state mảng Tags
-  const [tagInput, setTagInput] = useState("")         // Thêm state cho ô gõ Tag
+  const [category, setCategory] = useState("Personal")
+  const [tags, setTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState("")
 
   const [dragOver, setDragOver] = useState(false)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
 
-  // State cho Cropper
   const [rawImage, setRawImage] = useState<string | null>(null)
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
@@ -74,25 +73,22 @@ export function NewNoteModal({ open, onOpenChange, onSave }: NewNoteModalProps) 
 
   const [isSaving, setIsSaving] = useState(false)
 
-  // --- Xử lý Tags ---
   const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      e.preventDefault(); // Chặn việc submit form ngoài ý muốn
+      e.preventDefault();
       const newTag = tagInput.trim().toLowerCase();
       if (newTag && !tags.includes(newTag)) {
-        setTags(prev => [...prev, newTag]); // Dùng Functional Update để đảm bảo state mới nhất
+        setTags(prev => [...prev, newTag]);
       }
       setTagInput("");
     }
   };
 
   const handleRemoveTag = (e: React.MouseEvent, tagToRemove: string) => {
-    e.stopPropagation(); // QUAN TRỌNG: Ngăn chặn sự kiện click lan ra ngoài làm trigger các action khác
+    e.stopPropagation();
     setTags(prev => prev.filter(t => t !== tagToRemove));
   };
-  // ------------------
 
-  // Xử lý Ảnh (Drag & Drop)
   const handleDragOver = useCallback((e: DragEvent) => {
     e.preventDefault()
     setDragOver(true)
@@ -138,7 +134,6 @@ export function NewNoteModal({ open, onOpenChange, onSave }: NewNoteModalProps) 
     input.click()
   }, [])
 
-  // Xử lý Crop
   const onCropComplete = useCallback((croppedArea: Area, croppedAreaPixels: Area) => {
     setCroppedAreaPixels(croppedAreaPixels)
   }, [])
@@ -161,13 +156,11 @@ export function NewNoteModal({ open, onOpenChange, onSave }: NewNoteModalProps) 
     setRawImage(null)
   }
 
-  // Lưu & Đóng Modal
   const handleSave = async () => {
     if (!title.trim()) return
-    setIsSaving(true) // Bật trạng thái loading
+    setIsSaving(true)
 
     try {
-      // 1. Đóng gói dữ liệu để gửi xuống Backend
       const payload = {
         title: title.trim(),
         content: content.trim(),
@@ -176,14 +169,10 @@ export function NewNoteModal({ open, onOpenChange, onSave }: NewNoteModalProps) 
         tags: tags.length > 0 ? tags : ["untagged"],
       }
 
-      // 2. Gọi Server Action (API)
       const res = await createNote(payload)
 
       if (res.success && res.data) {
-        // 3. Báo thành công
-        toast.success("Tạo Note thành công! 🎉")
-
-        // Cập nhật lại giao diện (để thẻ Note mới hiện ra luôn trên Dashboard)
+        toast.success("Tạo Note thành công!")
         const newNote: Note = {
           id: res.data.id,
           title: res.data.title,
@@ -202,7 +191,7 @@ export function NewNoteModal({ open, onOpenChange, onSave }: NewNoteModalProps) 
     } catch (error) {
       toast.error("Có lỗi hệ thống xảy ra!")
     } finally {
-      setIsSaving(false) // Tắt loading dù thành công hay thất bại
+      setIsSaving(false)
     }
   }
 
@@ -224,8 +213,9 @@ export function NewNoteModal({ open, onOpenChange, onSave }: NewNoteModalProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] h-[90vh] flex flex-col backdrop-blur-sm bg-card/98 overflow-hidden">
-        <DialogHeader className="flex-shrink-0">
+      <DialogContent className="w-full sm:max-w-4xl h-[100dvh] sm:h-[90vh] max-h-[100dvh] sm:max-h-[90vh] flex flex-col p-4 sm:p-6 rounded-none sm:rounded-xl bg-card/98 backdrop-blur-sm overflow-hidden gap-0">
+
+        <DialogHeader className="flex-shrink-0 mb-4">
           <DialogTitle className="flex items-center gap-2 text-card-foreground">
             {isCropping ? <Crop className="size-5" /> : <FileText className="size-5" />}
             {isCropping ? "Crop Cover Image" : "New Note"}
@@ -235,10 +225,10 @@ export function NewNoteModal({ open, onOpenChange, onSave }: NewNoteModalProps) 
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-1 flex-col gap-4 min-h-0 overflow-y-auto pt-2">
-
+        {/* Nội dung chính có cuộn */}
+        <div className="flex flex-1 flex-col gap-4 min-h-0 overflow-y-auto px-1">
           {isCropping && rawImage ? (
-            <div className="relative w-full h-[400px] bg-black/10 rounded-lg overflow-hidden flex-shrink-0">
+            <div className="relative w-full h-[300px] sm:h-[400px] bg-black/10 rounded-lg overflow-hidden flex-shrink-0">
               <Cropper
                 image={rawImage}
                 crop={crop}
@@ -254,58 +244,57 @@ export function NewNoteModal({ open, onOpenChange, onSave }: NewNoteModalProps) 
             <>
               {imagePreview ? (
                 <div className="relative rounded-lg overflow-hidden border border-border group flex-shrink-0">
-                  <img src={imagePreview} alt="Cover preview" className="w-full h-48 object-cover transition-opacity group-hover:opacity-80" />
-                  <Button variant="destructive" size="icon" className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity rounded-full shadow-md" onClick={() => setImagePreview(null)}>
+                  <img src={imagePreview} alt="Cover preview" className="w-full h-40 sm:h-48 object-cover transition-opacity group-hover:opacity-80" />
+                  <Button variant="destructive" size="icon" className="absolute top-2 right-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity rounded-full shadow-md size-8 sm:size-10" onClick={() => setImagePreview(null)}>
                     <X className="size-4" />
                   </Button>
                 </div>
               ) : (
-                <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} onClick={handleFileSelect} className={cn("flex cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed py-6 transition-colors flex-shrink-0", dragOver ? "border-primary/50 bg-primary/5" : "border-border hover:border-muted-foreground/30 hover:bg-accent/50")}>
+                <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} onClick={handleFileSelect} className={cn("flex cursor-pointer flex-col items-center justify-center gap-2 sm:gap-3 rounded-lg border-2 border-dashed py-6 transition-colors flex-shrink-0", dragOver ? "border-primary/50 bg-primary/5" : "border-border hover:border-muted-foreground/30 hover:bg-accent/50")}>
                   <div className="rounded-full bg-muted p-3">
                     <ImagePlus className="size-6 text-muted-foreground" />
                   </div>
-                  <div className="text-center">
+                  <div className="text-center px-4">
                     <p className="text-sm font-medium text-foreground">Add a cover image</p>
-                    <p className="text-xs text-muted-foreground mt-1">Drag & drop, or click to browse (16:9 recommended)</p>
+                    <p className="text-xs text-muted-foreground mt-1">Drag & drop, or tap to browse</p>
                   </div>
                 </div>
               )}
 
               <Input
                 placeholder="Note title..."
-                className="text-xl font-bold h-14 border-transparent bg-transparent hover:bg-muted/30 focus-visible:bg-transparent focus-visible:ring-0 px-4 rounded-md shadow-none flex-shrink-0"
+                className="text-lg sm:text-xl font-bold h-12 sm:h-14 border-transparent bg-transparent hover:bg-muted/30 focus-visible:bg-transparent focus-visible:ring-0 px-2 sm:px-4 rounded-md shadow-none flex-shrink-0"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
               />
 
               {/* --- KHU VỰC THÔNG TIN: CATEGORY VÀ TAGS --- */}
-              <div className="flex flex-col sm:flex-row gap-4 px-4 flex-shrink-0 items-start sm:items-center">
-                {/* Chọn Category */}
+              <div className="flex flex-col sm:flex-row gap-3 px-1 sm:px-3 flex-shrink-0 items-start sm:items-center">
+                {/* Chọn Category (Full width on mobile) */}
                 <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="w-[160px] h-9">
+                  <SelectTrigger className="w-full sm:w-[160px] h-9">
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Learning">Learning</SelectItem>
-                    <SelectItem value="Engineering">Engineering</SelectItem>
-                    <SelectItem value="Design">Design</SelectItem>
-                    <SelectItem value="Personal">Personal</SelectItem>
+                    {categories?.map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
 
                 {/* Nhập Tags */}
                 <div className="flex-1 flex flex-wrap items-center gap-2 w-full border rounded-md px-3 min-h-9 bg-background focus-within:ring-1 focus-within:ring-ring">
-                  <Tag className="size-3.5 text-muted-foreground" />
+                  <Tag className="size-3.5 text-muted-foreground hidden sm:block" />
                   {tags.map(tag => (
-                    <Badge key={tag} variant="secondary" className="gap-1 px-1.5 py-0 text-xs font-normal">
+                    <Badge key={tag} variant="secondary" className="gap-1 px-1.5 py-0 text-xs font-normal my-1">
                       {tag}
                       <X className="size-3 cursor-pointer hover:text-destructive" onClick={(e) => handleRemoveTag(e, tag)} />
                     </Badge>
                   ))}
                   <input
                     type="text"
-                    placeholder={tags.length === 0 ? "Add tags (press Enter)..." : ""}
-                    className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground min-w-[120px] py-1.5"
+                    placeholder={tags.length === 0 ? "Add tags (Enter)..." : ""}
+                    className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-muted-foreground min-w-[100px] py-1.5"
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={handleAddTag}
@@ -314,36 +303,36 @@ export function NewNoteModal({ open, onOpenChange, onSave }: NewNoteModalProps) 
               </div>
               {/* ------------------------------------------ */}
 
-              <Tabs defaultValue="write" className="flex-1 flex flex-col min-h-0 mt-2">
+              <Tabs defaultValue="write" className="flex-1 flex flex-col min-h-0 mt-2 px-1 sm:px-3">
                 <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
                   <TabsTrigger value="write">Write</TabsTrigger>
                   <TabsTrigger value="preview">Preview</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="write" className="flex-1 min-h-0 flex flex-col mt-2">
+                <TabsContent value="write" className="flex-1 min-h-0 flex flex-col mt-3">
                   <Textarea
                     placeholder="Write your note in Markdown... Use # for headings, **bold**, etc."
-                    className="flex-1 resize-none text-base leading-relaxed font-mono border-muted bg-transparent focus-visible:ring-1 p-4 shadow-sm"
+                    className="flex-1 resize-none text-base leading-relaxed font-mono border-muted bg-transparent focus-visible:ring-1 p-3 sm:p-4 shadow-sm"
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                   />
                 </TabsContent>
 
-                <TabsContent value="preview" className="flex-1 min-h-0 overflow-y-auto mt-2 bg-muted/20 border border-muted rounded-md p-6">
+                <TabsContent value="preview" className="flex-1 min-h-0 overflow-y-auto mt-3 bg-muted/20 border border-muted rounded-md p-4 sm:p-6">
                   {content.trim() ? (
-                    <div className="text-foreground">
+                    <div className="text-foreground prose prose-sm dark:prose-invert max-w-none">
                       <ReactMarkdown
                         components={{
-                          h1: ({ node, ...props }) => <h1 className="text-3xl font-bold mt-6 mb-4 border-b pb-2" {...props} />,
-                          h2: ({ node, ...props }) => <h2 className="text-2xl font-semibold mt-5 mb-3" {...props} />,
-                          h3: ({ node, ...props }) => <h3 className="text-xl font-medium mt-4 mb-2" {...props} />,
-                          h4: ({ node, ...props }) => <h4 className="text-lg font-medium mt-3 mb-2" {...props} />,
-                          p: ({ node, ...props }) => <p className="mb-4 leading-relaxed" {...props} />,
-                          ul: ({ node, ...props }) => <ul className="list-disc list-inside mb-4 space-y-1" {...props} />,
-                          ol: ({ node, ...props }) => <ol className="list-decimal list-inside mb-4 space-y-1" {...props} />,
-                          li: ({ node, ...props }) => <li className="ml-4" {...props} />,
-                          blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-muted-foreground pl-4 italic my-4 text-muted-foreground" {...props} />,
-                          code: ({ node, ...props }) => <code className="bg-muted px-1.5 py-0.5 rounded-md font-mono text-sm" {...props} />
+                          h1: ({ node, ...props }) => <h1 className="text-2xl sm:text-3xl font-bold mt-4 sm:mt-6 mb-3 sm:mb-4 border-b pb-2" {...props} />,
+                          h2: ({ node, ...props }) => <h2 className="text-xl sm:text-2xl font-semibold mt-4 mb-2 sm:mb-3" {...props} />,
+                          h3: ({ node, ...props }) => <h3 className="text-lg sm:text-xl font-medium mt-3 mb-2" {...props} />,
+                          h4: ({ node, ...props }) => <h4 className="text-base sm:text-lg font-medium mt-2 mb-2" {...props} />,
+                          p: ({ node, ...props }) => <p className="mb-3 sm:mb-4 leading-relaxed" {...props} />,
+                          ul: ({ node, ...props }) => <ul className="list-disc list-inside mb-3 sm:mb-4 space-y-1" {...props} />,
+                          ol: ({ node, ...props }) => <ol className="list-decimal list-inside mb-3 sm:mb-4 space-y-1" {...props} />,
+                          li: ({ node, ...props }) => <li className="ml-2 sm:ml-4" {...props} />,
+                          blockquote: ({ node, ...props }) => <blockquote className="border-l-4 border-muted-foreground pl-3 sm:pl-4 italic my-3 sm:my-4 text-muted-foreground" {...props} />,
+                          code: ({ node, ...props }) => <code className="bg-muted px-1.5 py-0.5 rounded-md font-mono text-sm break-words" {...props} />
                         }}
                       >
                         {content}
@@ -358,16 +347,17 @@ export function NewNoteModal({ open, onOpenChange, onSave }: NewNoteModalProps) 
           )}
         </div>
 
-        <DialogFooter className="pt-4 mt-2 border-t border-border flex-shrink-0">
+        {/* Footer */}
+        <DialogFooter className="pt-4 mt-2 sm:mt-4 border-t border-border flex-shrink-0 flex-col sm:flex-row gap-2 sm:gap-0">
           {isCropping ? (
             <>
-              <Button variant="outline" onClick={handleCropCancel}>Cancel Crop</Button>
-              <Button onClick={handleCropConfirm} className="gap-2"><Check className="size-4" /> Apply Cover</Button>
+              <Button variant="outline" className="w-full sm:w-auto" onClick={handleCropCancel}>Cancel Crop</Button>
+              <Button onClick={handleCropConfirm} className="w-full sm:w-auto gap-2"><Check className="size-4" /> Apply Cover</Button>
             </>
           ) : (
             <>
-              <Button variant="outline" onClick={handleCancel}>Cancel</Button>
-              <Button onClick={handleSave} disabled={!title.trim() || isSaving}>
+              <Button variant="outline" className="w-full sm:w-auto" onClick={handleCancel}>Cancel</Button>
+              <Button className="w-full sm:w-auto" onClick={handleSave} disabled={!title.trim() || isSaving}>
                 {isSaving ? "Saving..." : "Save Note"}
               </Button>
             </>

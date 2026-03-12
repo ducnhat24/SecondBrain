@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
 
 // Lấy danh sách danh mục của user đang đăng nhập
 export async function getCategories() {
@@ -59,5 +60,25 @@ export async function deleteCategoryByName(name: string) {
         .eq('name', name)
 
     if (error) return { success: false, error: error.message }
+    return { success: true }
+}
+
+export async function updateCategoryByName(oldName: string, newName: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    // Chỉ cần cập nhật tên mới vào bảng categories là đủ!
+    const { error: categoryError } = await supabase
+        .from('categories')
+        .update({ name: newName })
+        .eq('user_id', user.id)
+        .eq('name', oldName)
+
+    if (categoryError) return { success: false, error: categoryError.message }
+
+    // Xóa cache để Frontend load lại danh sách mới
+    revalidatePath('/')
+
     return { success: true }
 }

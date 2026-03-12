@@ -20,6 +20,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { deleteNote } from "@/actions/note.actions"
+import { toast } from "sonner"
 
 interface NoteCardProps {
   note: Note
@@ -133,13 +135,24 @@ export function NoteCard({ note, onView, onDuplicate, onDelete }: NoteCardProps)
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              variant="destructive"
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete(note.id)
+              className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
+              onClick={async (e) => {
+                e.stopPropagation();
+                if (window.confirm("Bạn có chắc chắn muốn xóa note này vĩnh viễn?")) {
+                  // 1. Gọi API chém tận gốc dưới Database
+                  const res = await deleteNote(note.id);
+
+                  if (res.success) {
+                    toast.success("Đã xóa note vĩnh viễn!");
+                    // 2. Báo cho Frontend ẩn cái thẻ đi
+                    onDelete(note.id);
+                  } else {
+                    toast.error("Lỗi xóa note: " + res.error);
+                  }
+                }
               }}
             >
-              <Trash2 className="size-4" />
+              <Trash2 className="mr-2 size-4" />
               Delete
             </DropdownMenuItem>
           </DropdownMenuContent>

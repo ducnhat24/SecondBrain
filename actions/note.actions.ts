@@ -161,12 +161,29 @@ export async function updateNote(noteId: string, payload: {
 
     try {
         // 1. CẬP NHẬT THÔNG TIN CƠ BẢN CỦA NOTE
+        let categoryId = null;
+
+        // Nếu người dùng chọn một category cụ thể (không phải Untagged)
+        if (payload.categoryName && payload.categoryName !== "Untagged") {
+            const { data: catData } = await supabase
+                .from('categories')
+                .select('id')
+                .eq('name', payload.categoryName)
+                .eq('user_id', user.id)
+                .maybeSingle()
+
+            if (catData) {
+                categoryId = catData.id
+            }
+        }
+
+        // Tiến hành update Note với category_id vừa tìm được
         const { error: noteError } = await supabase
             .from('notes')
             .update({
                 title: payload.title,
                 content: payload.content,
-                // (Nếu Nhật muốn update cả category thì thêm logic tìm category_id ở đây nhé)
+                category_id: categoryId, // <-- Đây là chìa khóa để giữ category mới!
             })
             .eq('id', noteId)
 

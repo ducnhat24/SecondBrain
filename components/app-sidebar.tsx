@@ -12,6 +12,8 @@ import {
   Search,
   Trash2,
   X,
+  Edit2, // Thêm import Edit2
+  Plus,  // Thêm import Plus
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -32,6 +34,8 @@ interface AppSidebarProps {
   noteCount: number
   onDeleteCategory: (name: string) => void
   onDeleteTag: (name: string) => void
+  onCreateCategory: () => void             // Thêm prop tạo mới
+  onUpdateCategory: (name: string) => void // Thêm prop đổi tên
 }
 
 export function AppSidebar({
@@ -45,7 +49,9 @@ export function AppSidebar({
   onTagSelect,
   noteCount,
   onDeleteCategory,
-  onDeleteTag
+  onDeleteTag,
+  onCreateCategory,   // Lấy hàm từ props
+  onUpdateCategory,   // Lấy hàm từ props
 }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const router = useRouter()
@@ -92,9 +98,24 @@ export function AppSidebar({
         </div>
       )}
 
-      {/* Navigation - Đã được viết lại bằng thẻ HTML thuần, bao mượt */}
+      {/* Navigation */}
       <div className="flex-1 overflow-y-auto py-2">
         <nav className="flex flex-col gap-1 px-2">
+
+          {/* Header Categories & Nút Tạo mới (+) */}
+          {!collapsed && (
+            <div className="flex items-center justify-between px-3 py-2 mt-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Categories</span>
+              <button
+                onClick={onCreateCategory}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                title="Create new category"
+              >
+                <Plus className="size-4" />
+              </button>
+            </div>
+          )}
+
           {/* Nút All Notes */}
           <button
             onClick={() => onCategoryChange("All Notes")}
@@ -103,7 +124,7 @@ export function AppSidebar({
               selectedCategory === "All Notes"
                 ? "bg-sidebar-accent text-sidebar-foreground"
                 : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
-              collapsed && "justify-center px-0"
+              collapsed && "justify-center px-0 mt-2"
             )}
             title={collapsed ? "All Notes" : undefined}
           >
@@ -123,58 +144,81 @@ export function AppSidebar({
                     : "text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground",
                   collapsed && "justify-center px-0"
                 )}
+                title={collapsed ? category : undefined}
               >
                 <Folder className="size-4 shrink-0" />
                 {!collapsed && <span className="truncate">{category}</span>}
               </button>
 
-              {/* Nút xóa Category (Chỉ hiện khi hover) */}
+              {/* Nút Sửa và Xóa Category (Chỉ hiện khi hover) */}
               {!collapsed && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteCategory(category); // Gọi hàm ở đây
-                  }}
-                  className="absolute right-2 opacity-0 group-hover:opacity-100 p-1 hover:text-destructive transition-opacity"
-                >
-                  <Trash2 className="size-3" />
-                </button>
+                <div className="absolute right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUpdateCategory(category); // Gọi hàm Đổi tên
+                    }}
+                    className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                    title="Edit category"
+                  >
+                    <Edit2 className="size-3" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteCategory(category); // Gọi hàm Xóa
+                    }}
+                    className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                    title="Delete category"
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                </div>
               )}
             </div>
           ))}
         </nav>
 
         {/* Popular Tags */}
-        {tags.map((tag) => {
-          const isSelected = selectedTag === tag;
-          return (
-            <div key={tag} className="group relative inline-flex">
-              <button
-                onClick={() => onTagSelect(isSelected ? null : tag)}
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs transition-colors",
-                  isSelected
-                    ? "bg-foreground text-background font-medium"
-                    : "bg-sidebar-accent text-muted-foreground hover:bg-sidebar-accent/80 hover:text-sidebar-foreground"
-                )}
-              >
-                <Hash className="size-2.5" />
-                {tag}
-              </button>
+        {!collapsed && tags.length > 0 && (
+          <div className="mt-8 px-4">
+            <span className="mb-3 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Your Tags
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {tags.map((tag) => {
+                const isSelected = selectedTag === tag;
+                return (
+                  <div key={tag} className="group relative inline-flex">
+                    <button
+                      onClick={() => onTagSelect(isSelected ? null : tag)}
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors",
+                        isSelected
+                          ? "bg-foreground text-background font-medium"
+                          : "bg-sidebar-accent text-muted-foreground hover:bg-sidebar-accent/80 hover:text-sidebar-foreground"
+                      )}
+                    >
+                      <Hash className="size-3" />
+                      {tag}
+                    </button>
 
-              {/* Nút xóa Tag nhỏ xíu ở góc */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeleteTag(tag); // Gọi hàm ở đây
-                }}
-                className="absolute -top-1 -right-1 hidden group-hover:flex size-3 items-center justify-center rounded-full bg-destructive text-white shadow-sm"
-              >
-                <X className="size-2" />
-              </button>
+                    {/* Nút xóa Tag nhỏ xíu ở góc */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteTag(tag); // Gọi hàm Xóa Tag
+                      }}
+                      className="absolute -top-1.5 -right-1.5 hidden group-hover:flex size-3.5 items-center justify-center rounded-full bg-destructive text-white shadow-sm hover:scale-110 transition-transform"
+                    >
+                      <X className="size-2.5" />
+                    </button>
+                  </div>
+                )
+              })}
             </div>
-          )
-        })}
+          </div>
+        )}
       </div>
 
       {/* Footer */}
@@ -210,6 +254,6 @@ export function AppSidebar({
           </Button>
         </div>
       </div>
-    </aside >
+    </aside>
   )
 }

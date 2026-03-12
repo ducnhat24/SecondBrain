@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar, Tag, X, FileText, Edit2, Save, Trash2 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
-import type { Note } from "@/lib/sample-data"
+import { categories, type Note } from "@/lib/sample-data"
 import { toast } from "sonner"
 import { updateNote, deleteNote } from "@/actions/note.actions"
 
@@ -24,10 +24,11 @@ interface ViewNoteModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onEditNote: (note: Note) => void
-  onDeleteNote?: (id: string) => void // Thêm prop xóa nếu cần
+  onDeleteNote?: (id: string) => void
+  categories?: string[]
 }
 
-export function ViewNoteModal({ note, open, onOpenChange, onEditNote, onDeleteNote }: ViewNoteModalProps) {
+export function ViewNoteModal({ note, open, onOpenChange, onEditNote, onDeleteNote, categories }: ViewNoteModalProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editTitle, setEditTitle] = useState("")
   const [editContent, setEditContent] = useState("")
@@ -69,7 +70,7 @@ export function ViewNoteModal({ note, open, onOpenChange, onEditNote, onDeleteNo
           updatedAt: new Date().toISOString()
         })
         setIsEditing(false)
-        toast.success("Đã lưu thay đổi vào hệ thống! 💾")
+        toast.success("Đã lưu thay đổi vào hệ thống!")
       } else {
         toast.error("Lỗi: " + res.error)
       }
@@ -86,7 +87,7 @@ export function ViewNoteModal({ note, open, onOpenChange, onEditNote, onDeleteNo
     const res = await deleteNote(note.id) // Gọi API Server Action
 
     if (res.success) {
-      toast.success("Đã xóa note vĩnh viễn! 🗑️")
+      toast.success("Đã xóa note vĩnh viễn!")
 
       if (onDeleteNote) {
         onDeleteNote(note.id)
@@ -158,13 +159,12 @@ export function ViewNoteModal({ note, open, onOpenChange, onEditNote, onDeleteNo
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Learning">Learning</SelectItem>
-                    <SelectItem value="Engineering">Engineering</SelectItem>
-                    <SelectItem value="Design">Design</SelectItem>
-                    <SelectItem value="Personal">Personal</SelectItem>
+                    {/* Quét mảng categories thật để render ra UI */}
+                    {categories?.map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-
                 <div className="flex-1 flex flex-wrap items-center gap-2 border rounded-md px-2 min-h-8 bg-background focus-within:ring-1 focus-within:ring-ring">
                   {editTags.map(tag => (
                     <Badge key={tag} variant="secondary" className="gap-1 px-1.5 py-0 text-[10px] font-normal group">

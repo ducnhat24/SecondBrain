@@ -12,10 +12,12 @@ import { toast } from "sonner"
 
 import type { Note } from "@/lib/sample-data"
 import { getNotes } from "@/actions/note.actions"
-import { getCategories } from "@/actions/category.actions"
+import { createCategory, getCategories, deleteCategoryByName, updateCategoryByName } from "@/actions/category.actions"
 import { getTags } from "@/actions/tag.actions"
-import { deleteCategoryByName } from "@/actions/category.actions"
 import { deleteTagByName } from "@/actions/tag.actions"
+import { CategoryModal } from "@/components/category-modal"
+import { Menu } from "lucide-react"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 
 export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState("All Notes")
@@ -31,6 +33,23 @@ export default function Home() {
   const [newNoteOpen, setNewNoteOpen] = useState(false)
   const [viewingNote, setViewingNote] = useState<Note | null>(null)
   const [viewNoteOpen, setViewNoteOpen] = useState(false)
+
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false)
+  const [categoryModalMode, setCategoryModalMode] = useState<"create" | "edit">("create")
+  const [categoryToEdit, setCategoryToEdit] = useState("")
+
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  // 2 hàm bọc ngoài để: Khi user chọn Category hoặc Tag trên Mobile -> Tự động đóng Sidebar lại cho gọn
+  const handleCategorySelect = (cat: string) => {
+    setSelectedCategory(cat)
+    setIsMobileMenuOpen(false)
+  }
+
+  const handleTagSelect = (tag: string | null) => {
+    setSelectedTag(tag)
+    setIsMobileMenuOpen(false)
+  }
 
   // FETCH DATA TỪ SUPABASE
   useEffect(() => {
@@ -156,25 +175,127 @@ export default function Home() {
       toast.error("Lỗi xóa tag: " + res.error)
     }
   }
+  const openCreateCategoryModal = () => {
+    setCategoryModalMode("create")
+    setCategoryToEdit("")
+    setCategoryModalOpen(true)
+  }
 
+  const openEditCategoryModal = (oldName: string) => {
+    setCategoryModalMode("edit")
+    setCategoryToEdit(oldName)
+    setCategoryModalOpen(true)
+  }
+
+  const handleSaveCategoryModal = async (newName: string) => {
+    // 1. Check trùng lặp
+    if (dbCategories.includes(newName) && newName !== categoryToEdit) {
+      toast.error("Danh mục này đã tồn tại!")
+      return
+    }
+
+    // 2. Chế độ TẠO MỚI
+    if (categoryModalMode === "create") {
+      const res = await createCategory(newName)
+      if (res.success) {
+        toast.success("Tạo danh mục thành công!")
+        setDbCategories(prev => [...prev, newName])
+        setCategoryModalOpen(false) // Đóng Modal
+      } else {
+        toast.error("Lỗi: " + res.error)
+      }
+    }
+    // 3. Chế độ ĐỔI TÊN
+    else {
+      const res = await updateCategoryByName(categoryToEdit, newName)
+      if (res.success) {
+        toast.success("Đã đổi tên danh mục!")
+        setDbCategories(prev => prev.map(c => c === categoryToEdit ? newName : c))
+        if (selectedCategory === categoryToEdit) setSelectedCategory(newName)
+        setNotes(prev => prev.map(note =>
+          note.category === categoryToEdit ? { ...note, category: newName } : note
+        ))
+        setCategoryModalOpen(false) // Đóng Modal
+      } else {
+        toast.error("Lỗi: " + res.error)
+      }
+    }
+  }
+
+  // Tự động tính toán những Category và Tag ĐANG ĐƯỢC SỬ DỤNG bởi mảng notes hiện tại
+  const activeCategories = useMemo(() => {
+    const usedCats = new Set(notes.map(n => n.category))
+    return dbCategories.filter(c => usedCats.has(c))
+  }, [notes, dbCategories])
+
+  const activeTags = useMemo(() => {
+    const allTags = notes.flatMap(note => note.tags || [])
+    const uniqueTags = new Set(allTags)
+    uniqueTags.delete("untagged")
+    return Array.from(uniqueTags).sort()
+  }, [notes])
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
-      <AppSidebar
-        categories={dbCategories}
-        tags={dbTags}
-        selectedCategory={selectedCategory}
-        onCategoryChange={setSelectedCategory}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        selectedTag={selectedTag}
-        onTagSelect={setSelectedTag}
-        noteCount={notes.length}
-        onDeleteCategory={handleDeleteCategory}
-        onDeleteTag={handleDeleteTag}
-      />
 
-      <main className="flex-1 overflow-y-auto flex flex-col">
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/95 px-6 py-4 backdrop-blur-sm">
+      {/* 1. DESKTOP SIDEBAR (Sẽ bị ẩn đi trên màn hình điện thoại) */}
+      <div className="hidden md:block">
+        <AppSidebar
+          categories={dbCategories}
+          tags={activeTags}
+          selectedCategory={selectedCategory}
+          onCategoryChange={setSelectedCategory}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          selectedTag={selectedTag}
+          onTagSelect={setSelectedTag}
+          noteCount={notes.length}
+          onDeleteCategory={handleDeleteCategory}
+          onDeleteTag={handleDeleteTag}
+          onCreateCategory={openCreateCategoryModal}
+          onUpdateCategory={openEditCategoryModal}
+        />
+      </div>
+
+      <main className="flex-1 overflow-y-auto flex flex-col relative">
+
+        {/* 2. MOBILE HEADER (Chỉ hiện trên điện thoại) */}
+        <header className="md:hidden sticky top-0 z-20 flex items-center justify-between border-b border-border bg-background/95 px-4 py-3 backdrop-blur-sm">
+          <div className="flex items-center gap-3">
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="shrink-0 -ml-2">
+                  <Menu className="size-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-[280px] border-none">
+                {/* Tái sử dụng lại Sidebar nguyên bản cho Mobile */}
+                <AppSidebar
+                  categories={dbCategories}
+                  tags={activeTags}
+                  selectedCategory={selectedCategory}
+                  onCategoryChange={handleCategorySelect} // Dùng hàm bọc để auto-close
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                  selectedTag={selectedTag}
+                  onTagSelect={handleTagSelect} // Dùng hàm bọc để auto-close
+                  noteCount={notes.length}
+                  onDeleteCategory={handleDeleteCategory}
+                  onDeleteTag={handleDeleteTag}
+                  onCreateCategory={openCreateCategoryModal}
+                  onUpdateCategory={openEditCategoryModal}
+                />
+              </SheetContent>
+            </Sheet>
+            <span className="font-semibold truncate max-w-[150px]">{selectedCategory}</span>
+          </div>
+          <Button onClick={() => setNewNoteOpen(true)} size="sm" className="gap-1.5 h-8">
+            <Plus className="size-3.5" />
+            <span className="text-xs">New</span>
+          </Button>
+        </header>
+
+        {/* 3. DESKTOP HEADER (Giữ nguyên code header cũ của bạn, nhưng thêm hidden md:flex) */}
+        <header className="hidden md:flex sticky top-0 z-10 items-center justify-between border-b border-border bg-background/95 px-6 py-4 backdrop-blur-sm">
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-foreground">
               {selectedCategory}
@@ -190,7 +311,8 @@ export default function Home() {
           </Button>
         </header>
 
-        <div className="p-6 flex-1">
+        {/* 4. KHUNG HIỂN THỊ NOTES */}
+        <div className="p-4 md:p-6 flex-1">
           {isLoading ? (
             <div className="flex h-full w-full items-center justify-center flex-col gap-3 text-muted-foreground">
               <Loader2 className="size-8 animate-spin" />
@@ -207,8 +329,10 @@ export default function Home() {
         </div>
       </main>
 
-      <NewNoteModal open={newNoteOpen} onOpenChange={setNewNoteOpen} onSave={handleSaveNote} />
-      <ViewNoteModal note={viewingNote} open={viewNoteOpen} onOpenChange={setViewNoteOpen} onEditNote={handleEditNote} />
+      {/* --- CÁC MODALS GIỮ NGUYÊN --- */}
+      <NewNoteModal open={newNoteOpen} onOpenChange={setNewNoteOpen} onSave={handleSaveNote} categories={dbCategories} />
+      <ViewNoteModal note={viewingNote} open={viewNoteOpen} onOpenChange={setViewNoteOpen} onEditNote={handleEditNote} onDeleteNote={handleDeleteNote} categories={dbCategories} />
+      <CategoryModal open={categoryModalOpen} onOpenChange={setCategoryModalOpen} onSave={handleSaveCategoryModal} mode={categoryModalMode} initialName={categoryToEdit} />
       <RagChat />
     </div>
   )
